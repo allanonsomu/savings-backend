@@ -1,0 +1,59 @@
+name: Build and Deploy Node.js Application
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'  # Adjust the Node.js version as needed
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Step 4: Archive build artifacts (if applicable)
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: node-app-artifacts
+          path: ./
+
+      # Step 5: Deploy to cPanel via FTP
+      - name: Deploy to cPanel
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.1
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: /public_html/pms/
+
+      # Step 6: SSH into the server and run commands
+      - name: SSH into server and run commands
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /public_html/summitrecruitment-search.com/pms/public_html/pms/
+            npm install --production  # Install production dependencies
+            npm run migrate  # Run migrations
+            npm run seed:all  # Run seeders
+            pm2 restart all  # Restart the server (adjust as needed)
